@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+
+Return a user ID instead of a WP_User object from the WooCommerce.com determine_current_user filter callback.

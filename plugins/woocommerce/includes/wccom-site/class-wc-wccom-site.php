@@ -49,7 +49,7 @@ class WC_WCCOM_Site {
 	 *
 	 * @since 3.7.0
 	 * @param int|false $user_id User ID.
-	 * @return int|WP_User|false
+	 * @return int|false
 	 */
 	public static function authenticate_wccom( $user_id ) {
 		if ( ! empty( $user_id ) || ! self::is_request_to_wccom_site_rest_api() ) {
@@ -132,7 +132,7 @@ class WC_WCCOM_Site {
 			return false;
 		}
 
-		return $user;
+		return $user->ID;
 	}
 
 	/**
@@ -150,13 +150,13 @@ class WC_WCCOM_Site {
 			return $error;
 		}
 
-		$user = self::authenticate_wccom( false );
+		$user_id = self::authenticate_wccom( false );
 
-		if ( ! $user instanceof WP_User ) {
+		if ( ! $user_id ) {
 			return $error;
 		}
 
-		wp_set_current_user( $user->ID );
+		wp_set_current_user( $user_id );
 		return true;
 	}
 
