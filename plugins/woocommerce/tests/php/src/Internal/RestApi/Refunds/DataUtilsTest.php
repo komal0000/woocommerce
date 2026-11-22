@@ -1604,6 +1604,85 @@ class DataUtilsTest extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox Should not call a zero total order without refunds fully refunded.
+	 *
+	 * @testWith ["validate_line_items"]
+	 *           ["validate_preview_line_items"]
+	 *
+	 * @param string $method The DataUtils validation method under test.
+	 */
+	public function test_validate_zero_total_order_is_not_reported_as_fully_refunded( string $method ): void {
+		$order = wc_create_order();
+		$item  = new WC_Order_Item_Product();
+		$item->set_props(
+			array(
+				'name'     => 'Free item',
+				'quantity' => 1,
+				'subtotal' => 0,
+				'total'    => 0,
+			)
+		);
+		$item->save();
+		$order->add_item( $item );
+		$order->set_total( 0 );
+		$order->set_status( OrderStatus::COMPLETED );
+		$order->save();
+
+		$result = $this->data_utils->$method(
+			array(
+				array(
+					'line_item_id' => $item->get_id(),
+					'quantity'     => 1,
+				),
+			),
+			$order
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'order_not_refundable', $result->get_error_code() );
+		$this->assertSame( 422, $result->get_error_data()['status'] );
+		$this->assertSame( 'This order has no amount left to refund.', $result->get_error_message() );
+	}
+
+	/**
+	 * @testdox Should say an order with refunds that cover its total has already been fully refunded.
+	 *
+	 * @testWith ["validate_line_items"]
+	 *           ["validate_preview_line_items"]
+	 *
+	 * @param string $method The DataUtils validation method under test.
+	 */
+	public function test_validate_refunded_order_is_reported_as_fully_refunded( string $method ): void {
+		$order = $this->create_order_with_taxes( array(), 50.00 );
+		$order->set_status( OrderStatus::COMPLETED );
+		$order->save();
+
+		$items = $order->get_items( 'line_item' );
+		$item  = reset( $items );
+
+		wc_create_refund(
+			array(
+				'order_id' => $order->get_id(),
+				'amount'   => $order->get_total(),
+			)
+		);
+
+		$result = $this->data_utils->$method(
+			array(
+				array(
+					'line_item_id' => $item->get_id(),
+					'quantity'     => 1,
+				),
+			),
+			$order
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'order_not_refundable', $result->get_error_code() );
+		$this->assertSame( 'This order has already been fully refunded.', $result->get_error_message() );
+	}
+
+	/**
 	 * @testdox Should cap a quantity preview of a partially-refunded shipping line to its remaining amount.
 	 *
 	 * Order has a $10 shipping line + a $50 product line so the order is still
